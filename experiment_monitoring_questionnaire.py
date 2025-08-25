@@ -12,6 +12,7 @@ from questionnaire_config import create_custom_question_set, validate_question_f
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
+import os
 
 def create_experiment_monitoring_questions():
     """Create the experiment monitoring questions."""
@@ -79,48 +80,30 @@ def create_experiment_monitoring_questions():
                 "Median ITACS",
                 "Terms distribution",
                 "% Z-term",
-                "Other (specify below)"
+                "All metrics from above"
             ],
             "required": True
         },
         {
-            "id": "custom_metrics",
-            "question": "If you selected 'Other', please specify the metrics:",
-            "type": "text",
-            "required": False
-        },
-        {
-            "id": "experiment_goals",
-            "question": "What are the primary goals of this experiment?",
+            "id": "monitoring_segmentation",
+            "question": "7. What segmentation should we use for monitoring?",
             "type": "multi_select",
             "options": [
-                "Increase conversion rates",
-                "Improve user engagement",
-                "Reduce customer acquisition costs",
-                "Increase average order value",
-                "Improve customer satisfaction",
-                "Test new features or designs",
-                "Optimize pricing strategy",
-                "Improve checkout process",
-                "Test APR/pricing changes",
-                "Improve credit approval rates",
-                "Increase loan take-up",
-                "Optimize risk assessment",
-                "Other (specify below)"
+                "Overall",
+                "NTA vs. Repeat",
+                "FICO Bands",
+                "AOV Bands",
+                "ITACS Bands",
+                "Loan Type (IB vs. 0%)"
             ],
-            "required": False
+            "required": True
         },
         {
-            "id": "custom_goals",
-            "question": "If you selected 'Other' for goals, please specify:",
+            "id": "additional_context",
+            "question": "8. Please provide any additional context that may be useful for the interpretation of results.",
             "type": "text",
-            "required": False
-        },
-        {
-            "id": "success_criteria",
-            "question": "What would you consider a successful outcome for this experiment?",
-            "type": "text",
-            "required": False
+            "required": False,
+            "help_text": "This could include experiment goals, success criteria, business context, expected outcomes, or any other information that would help interpret the results."
         }
     ]
     
@@ -237,37 +220,38 @@ def create_experiment_questionnaire_class():
             
             # Metrics Analysis
             metrics = self.responses.get("metrics_to_monitor", [])
-            custom_metrics = self.responses.get("custom_metrics", "")
-            if metrics or custom_metrics:
-                all_metrics = self._compile_all_metrics(metrics, custom_metrics)
+            if metrics:
+                all_metrics = self._compile_all_metrics(metrics, "")
+                # Check if "All metrics from above" was selected
+                all_selected = "All metrics from above" in metrics
+                
                 self.analysis_results["metrics_analysis"] = {
                     "selected_metrics": metrics,
-                    "custom_metrics": custom_metrics,
+                    "all_metrics_selected": all_selected,
+                    "compiled_metrics": all_metrics,
                     "total_metrics": len(all_metrics),
                     "metric_categories": self._categorize_metrics(all_metrics),
                     "monitoring_complexity": self._assess_monitoring_complexity(len(all_metrics)),
                     "metric_descriptions": {metric: self._get_metric_description(metric) for metric in all_metrics}
                 }
             
-            # Experiment Goals Analysis
-            goals = self.responses.get("experiment_goals", [])
-            custom_goals = self.responses.get("custom_goals", "")
-            if goals or custom_goals:
-                all_goals = self._compile_all_goals(goals, custom_goals)
-                self.analysis_results["goals_analysis"] = {
-                    "selected_goals": goals,
-                    "custom_goals": custom_goals,
-                    "total_goals": len(all_goals),
-                    "goal_alignment": self._assess_goal_alignment(all_goals, metrics)
+            # Monitoring Segmentation Analysis
+            segmentation = self.responses.get("monitoring_segmentation", [])
+            if segmentation:
+                self.analysis_results["segmentation_analysis"] = {
+                    "selected_segmentation": segmentation,
+                    "total_segments": len(segmentation),
+                    "segmentation_complexity": self._assess_segmentation_complexity(segmentation),
+                    "segmentation_implications": self._analyze_segmentation_implications(segmentation)
                 }
             
-            # Success Criteria Analysis
-            success_criteria = self.responses.get("success_criteria")
-            if success_criteria:
-                self.analysis_results["success_criteria_analysis"] = {
-                    "criteria": success_criteria,
-                    "measurability": self._assess_measurability(success_criteria),
-                    "alignment_with_metrics": self._assess_criteria_metric_alignment(success_criteria, metrics)
+            # Additional Context Analysis
+            additional_context = self.responses.get("additional_context", "")
+            if additional_context:
+                self.analysis_results["additional_context_analysis"] = {
+                    "context": additional_context,
+                    "context_length": len(additional_context),
+                    "context_clarity": self._assess_description_clarity(additional_context)
                 }
             
             # Generate overall assessment
@@ -538,12 +522,62 @@ def create_experiment_questionnaire_class():
                 for rec in overall.get('key_recommendations', []):
                     print(f"  • {rec}")
         
-        def save_results(self, filename: Optional[str] = None):
-            """Save results to a JSON file."""
+        def _ask_save_format(self) -> str:
+            """Ask user for their preferred save format."""
+            print("\n" + "=" * 60)
+            print("           SAVE RESULTS")
+            print("=" * 60)
+            print("\nChoose your preferred output format:")
+            print("1. JSON (structured data, good for programmatic use)")
+            print("2. CSV (spreadsheet format, good for analysis)")
+            print("3. TXT (human-readable report, good for sharing)")
+            
+            while True:
+                try:
+                    choice = input("\nEnter your choice (1-3): ").strip()
+                    if choice == "1":
+                        return "json"
+                    elif choice == "2":
+                        return "csv"
+                    elif choice == "3":
+                        return "txt"
+                    else:
+                        print("Please enter 1, 2, or 3.")
+                except KeyboardInterrupt:
+                    print("\n\nSaving cancelled.")
+                    return "json"
+        
+        def save_results(self, filename: Optional[str] = None, format_type: str = "json"):
+            """Save results to a file in the specified format."""
             if not filename:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"experiment_monitoring_{timestamp}.json"
+                base_filename = f"experiment_monitoring_{timestamp}"
+                if format_type == "json":
+                    filename = f"{base_filename}.json"
+                elif format_type == "csv":
+                    filename = f"{base_filename}.csv"
+                elif format_type == "txt":
+                    filename = f"{base_filename}.txt"
+                else:
+                    filename = f"{base_filename}.json"
+                    format_type = "json"
             
+            try:
+                if format_type == "json":
+                    self._save_json(filename)
+                elif format_type == "csv":
+                    self._save_csv(filename)
+                elif format_type == "txt":
+                    self._save_txt(filename)
+                else:
+                    self._save_json(filename)
+                
+                print(f"\nResults saved to: {filename}")
+            except Exception as e:
+                print(f"Error saving results: {e}")
+        
+        def _save_json(self, filename: str):
+            """Save results to a JSON file."""
             results = {
                 "timestamp": datetime.now().isoformat(),
                 "question_set": "experiment_monitoring",
@@ -556,12 +590,140 @@ def create_experiment_questionnaire_class():
                 "analysis": self.analysis_results
             }
             
-            try:
-                with open(filename, 'w') as f:
-                    json.dump(results, f, indent=2)
-                print(f"\nResults saved to: {filename}")
-            except Exception as e:
-                print(f"Error saving results: {e}")
+            with open(filename, 'w') as f:
+                json.dump(results, f, indent=2)
+        
+        def _save_csv(self, filename: str):
+            """Save results to a CSV file."""
+            import csv
+            
+            with open(filename, 'w', newline='') as f:
+                writer = csv.writer(f)
+                
+                # Write header
+                writer.writerow(["Section", "Field", "Value", "Details"])
+                
+                # Write experiment description
+                writer.writerow(["Experiment", "Description", self.responses.get("experiment_description", ""), ""])
+                
+                # Write merchant ARIs
+                writer.writerow(["Merchant ARIs", "ARI List", self.responses.get("merchant_aris", ""), ""])
+                writer.writerow(["Merchant ARIs", "ARI Type", self.responses.get("ari_type", ""), ""])
+                
+                # Write test timing
+                writer.writerow(["Test Timing", "Start Date", self.responses.get("test_start_date", ""), ""])
+                writer.writerow(["Test Timing", "End Date", self.responses.get("test_end_date", ""), ""])
+                
+                # Write control timing
+                writer.writerow(["Control Timing", "Start Date", self.responses.get("control_start_date", ""), ""])
+                writer.writerow(["Control Timing", "End Date", self.responses.get("control_end_date", ""), ""])
+                
+                # Write metrics
+                metrics = self.responses.get("metrics_to_monitor", [])
+                for metric in metrics:
+                    writer.writerow(["Metrics", "Selected", metric, ""])
+                
+                # Write segmentation
+                segmentation = self.responses.get("monitoring_segmentation", [])
+                for segment in segmentation:
+                    writer.writerow(["Segmentation", "Selected", segment, ""])
+                
+                # Write additional context
+                additional_context = self.responses.get("additional_context", "")
+                if additional_context:
+                    writer.writerow(["Additional Context", "Context", additional_context, ""])
+                
+                # Write analysis results
+                if "overall_assessment" in self.analysis_results:
+                    overall = self.analysis_results["overall_assessment"]
+                    writer.writerow(["Analysis", "Complexity Level", overall.get("complexity_level", ""), ""])
+                    writer.writerow(["Analysis", "Complexity Score", overall.get("complexity_score", ""), ""])
+                    writer.writerow(["Analysis", "Monitoring Scope", overall.get("monitoring_scope", ""), ""])
+                    writer.writerow(["Analysis", "Experiment Readiness", overall.get("experiment_readiness", ""), ""])
+        
+        def _save_txt(self, filename: str):
+            """Save results to a formatted text file."""
+            with open(filename, 'w') as f:
+                f.write("=" * 80 + "\n")
+                f.write("                    EXPERIMENT MONITORING RESULTS\n")
+                f.write("=" * 80 + "\n\n")
+                
+                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+                
+                # Experiment Information
+                f.write("EXPERIMENT INFORMATION\n")
+                f.write("-" * 40 + "\n")
+                f.write(f"Description: {self.responses.get('experiment_description', 'N/A')}\n")
+                f.write(f"Merchant ARIs: {self.responses.get('merchant_aris', 'N/A')}\n")
+                f.write(f"ARI Type: {self.responses.get('ari_type', 'N/A')}\n\n")
+                
+                # Test Period
+                f.write("TEST PERIOD\n")
+                f.write("-" * 40 + "\n")
+                f.write(f"Start Date: {self.responses.get('test_start_date', 'N/A')}\n")
+                f.write(f"End Date: {self.responses.get('test_end_date', 'N/A')}\n")
+                if "test_timing_analysis" in self.analysis_results:
+                    test_analysis = self.analysis_results["test_timing_analysis"]
+                    f.write(f"Duration: {test_analysis.get('test_duration', 'N/A')}\n")
+                    f.write(f"Timing Implications: {test_analysis.get('timing_implications', 'N/A')}\n")
+                f.write("\n")
+                
+                # Control Period
+                f.write("CONTROL PERIOD\n")
+                f.write("-" * 40 + "\n")
+                f.write(f"Start Date: {self.responses.get('control_start_date', 'N/A')}\n")
+                f.write(f"End Date: {self.responses.get('control_end_date', 'N/A')}\n")
+                if "control_period_analysis" in self.analysis_results:
+                    control_analysis = self.analysis_results["control_period_analysis"]
+                    f.write(f"Duration: {control_analysis.get('control_duration', 'N/A')}\n")
+                    f.write(f"Statistical Implications: {control_analysis.get('statistical_implications', 'N/A')}\n")
+                f.write("\n")
+                
+                # Metrics
+                f.write("METRICS TO MONITOR\n")
+                f.write("-" * 40 + "\n")
+                metrics = self.responses.get("metrics_to_monitor", [])
+                
+                # Check if "All metrics from above" was selected
+                if "All metrics from above" in metrics:
+                    f.write("✅ All metrics from above selected\n")
+                    f.write("   This includes all individual metrics:\n")
+                    all_compiled_metrics = self._compile_all_metrics(metrics, "")
+                    for i, metric in enumerate(all_compiled_metrics, 1):
+                        f.write(f"   {i}. {metric}\n")
+                else:
+                    for i, metric in enumerate(metrics, 1):
+                        f.write(f"{i}. {metric}\n")
+                f.write("\n")
+                
+                # Segmentation
+                f.write("MONITORING SEGMENTATION\n")
+                f.write("-" * 40 + "\n")
+                segmentation = self.responses.get("monitoring_segmentation", [])
+                for i, segment in enumerate(segmentation, 1):
+                    f.write(f"{i}. {segment}\n")
+                f.write("\n")
+                
+                # Additional Context
+                additional_context = self.responses.get("additional_context", "")
+                if additional_context:
+                    f.write("ADDITIONAL CONTEXT\n")
+                    f.write("-" * 40 + "\n")
+                    f.write(f"{additional_context}\n\n")
+                
+                # Analysis Summary
+                if "overall_assessment" in self.analysis_results:
+                    f.write("ANALYSIS SUMMARY\n")
+                    f.write("-" * 40 + "\n")
+                    overall = self.analysis_results["overall_assessment"]
+                    f.write(f"Complexity Level: {overall.get('complexity_level', 'N/A')}\n")
+                    f.write(f"Complexity Score: {overall.get('complexity_score', 'N/A')}\n")
+                    f.write(f"Monitoring Scope: {overall.get('monitoring_scope', 'N/A')}\n")
+                    f.write(f"Experiment Readiness: {overall.get('experiment_readiness', 'N/A')}\n\n")
+                    
+                    f.write("Key Recommendations:\n")
+                    for rec in overall.get('key_recommendations', []):
+                        f.write(f"• {rec}\n")
         
         def conduct_questionnaire(self):
             """Conduct the experiment monitoring questionnaire with validation."""
@@ -768,13 +930,33 @@ def create_experiment_questionnaire_class():
             """Compile all metrics for analysis."""
             all_metrics = selected_metrics.copy()
             
-            if custom_metrics and "Other" in selected_metrics:
-                # Parse custom metrics (assuming comma-separated or newline-separated)
-                custom_list = [metric.strip() for metric in custom_metrics.replace('\n', ',').split(',') if metric.strip()]
-                all_metrics.extend(custom_list)
-                # Remove the placeholder "Other" option
-                if "Other (specify below)" in all_metrics:
-                    all_metrics.remove("Other (specify below)")
+            # Handle "All metrics from above" selection
+            if "All metrics from above" in all_metrics:
+                # Remove the "All metrics from above" option
+                all_metrics.remove("All metrics from above")
+                # Add all individual metrics
+                individual_metrics = [
+                    "Authed GMV",
+                    "Checkouts",
+                    "E2E Conversion",
+                    "AOV",
+                    "Application Rate",
+                    "Authentication Rate",
+                    "Approval Rate",
+                    "Take-up Rate",
+                    "Auth Rate",
+                    "Median FICO",
+                    "% Prime+ Population",
+                    "Median ITACS",
+                    "Terms distribution",
+                    "% Z-term"
+                ]
+                # Add individual metrics (avoiding duplicates)
+                for metric in individual_metrics:
+                    if metric not in all_metrics:
+                        all_metrics.append(metric)
+            
+            # Remove any "Other" options if they exist
             
             return all_metrics
         
@@ -843,8 +1025,6 @@ def create_experiment_questionnaire_class():
                 custom_list = [goal.strip() for goal in custom_goals.replace('\n', ',').split(',') if goal.strip()]
                 all_goals.extend(custom_list)
                 # Remove the placeholder "Other" option
-                if "Other (specify below)" in selected_goals:
-                    all_goals.remove("Other (specify below)")
             
             return all_goals
         
@@ -941,13 +1121,104 @@ def create_experiment_questionnaire_class():
                 # Display results
                 self.display_analysis()
                 
+                # Generate and display SQL query
+                print("\n" + "=" * 80)
+                print("                    GENERATING SQL QUERY")
+                print("=" * 80)
+                try:
+                    sql_query = self.generate_populated_sql()
+                    print("✅ SQL Query generated successfully!")
+                    print("\n📋 GENERATED SQL QUERY:")
+                    print("-" * 80)
+                    print(sql_query)
+                    print("-" * 80)
+                    
+                    # Ask if user wants to save the SQL query
+                    sql_save_choice = input("\nWould you like to save the SQL query to a file? (y/n): ").lower()
+                    if sql_save_choice in ['y', 'yes']:
+                        sql_filename = input("Enter SQL filename (or press Enter for default): ").strip()
+                        if not sql_filename:
+                            sql_filename = None
+                        
+                        saved_sql_file = self.save_sql_query(sql_filename)
+                        print(f"✅ SQL query saved to: {saved_sql_file}")
+                        print("🚀 You can now run this query in Snowflake to analyze your experiment data!")
+                    
+                    # Ask if user wants to test connection first
+                    test_choice = input("\nWould you like to test the Snowflake connection first? (y/n): ").lower()
+                    if test_choice in ['y', 'yes']:
+                        print("\n🔍 Testing Snowflake connection...")
+                        try:
+                            connection_test = self.test_snowflake_connection()
+                            if connection_test.get('success'):
+                                print("✅ Snowflake connection successful!")
+                                print(f"📊 Connected to: {connection_test['connection_info']['database']}.{connection_test['connection_info']['schema']}")
+                                print(f"🏭 Using warehouse: {connection_test['connection_info']['warehouse']}")
+                                print(f"📋 Available tables: {', '.join(connection_test['available_tables'][:10])}{'...' if len(connection_test['available_tables']) > 10 else ''}")
+                            else:
+                                print(f"❌ Connection test failed: {connection_test.get('error', 'Unknown error')}")
+                        except Exception as e:
+                            print(f"❌ Error during connection test: {e}")
+                    
+                    # Ask if user wants to execute the query and analyze results
+                    execute_choice = input("\nWould you like to execute this query and analyze the results now? (y/n): ").lower()
+                    if execute_choice in ['y', 'yes']:
+                        print("\n🔄 Executing SQL query against Snowflake...")
+                        try:
+                            # Execute the query
+                            results = self.execute_sql_query()
+                            
+                            if results.get('success'):
+                                print("✅ Query executed successfully!")
+                                
+                                # Analyze the results
+                                print("📊 Analyzing experiment results...")
+                                analysis = self.analyze_experiment_results(results)
+                                
+                                # Display the results
+                                self.display_experiment_results(results, analysis)
+                                
+                                # Ask if user wants to save the results
+                                save_results_choice = input("\nWould you like to save the experiment results? (y/n): ").lower()
+                                if save_results_choice in ['y', 'yes']:
+                                    results_filename = input("Enter results filename (or press Enter for default): ").strip()
+                                    if not results_filename:
+                                        results_filename = f"experiment_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                                    
+                                    # Save results and analysis
+                                    import json
+                                    full_results = {
+                                        'execution_timestamp': datetime.now().isoformat(),
+                                        'sql_query': results['sql_query'],
+                                        'raw_data': results['data'],
+                                        'analysis': analysis
+                                    }
+                                    
+                                    with open(results_filename, 'w') as f:
+                                        json.dump(full_results, f, indent=2, default=str)
+                                    
+                                    print(f"✅ Experiment results saved to: {results_filename}")
+                            else:
+                                print(f"❌ Query execution failed: {results.get('error', 'Unknown error')}")
+                                
+                        except Exception as e:
+                            print(f"❌ Error during query execution: {e}")
+                    
+                except Exception as e:
+                    print(f"❌ Error generating SQL query: {e}")
+                
                 # Save results
                 save_choice = input("\nWould you like to save the results? (y/n): ").lower()
                 if save_choice in ['y', 'yes']:
+                    # Ask for format preference
+                    format_type = self._ask_save_format()
+                    
                     filename = input("Enter filename (or press Enter for default): ").strip()
                     if not filename:
                         filename = None
-                    self.save_results(filename)
+                    
+                    # Save in the chosen format
+                    self.save_results(filename, format_type)
                 
                 print("\nExperiment monitoring setup complete! Thank you for using the questionnaire tool.")
                 
@@ -973,7 +1244,7 @@ def create_experiment_questionnaire_class():
             # Metrics complexity
             metrics_count = len(self._compile_all_metrics(
                 self.responses.get("metrics_to_monitor", []),
-                self.responses.get("custom_metrics", "")
+                ""
             ))
             if metrics_count > 10:
                 complexity_score += 2
@@ -1030,8 +1301,8 @@ def create_experiment_questionnaire_class():
             if metrics_count > 10:
                 recommendations.append("Many metrics - consider grouping or prioritization")
             
-            if not self.responses.get("success_criteria"):
-                recommendations.append("Define clear success criteria for better experiment evaluation")
+            if not self.responses.get("additional_context"):
+                recommendations.append("Provide additional context for better experiment evaluation")
             
             # Add ARI type specific recommendations
             ari_type = self.responses.get("ari_type", "")
@@ -1045,7 +1316,445 @@ def create_experiment_questionnaire_class():
                 "key_recommendations": recommendations,
                 "experiment_readiness": "Ready" if complexity_level != "High" else "Needs Planning"
             }
+        
+        def _assess_segmentation_complexity(self, segmentation: List[str]) -> str:
+            """Assess the complexity of monitoring based on segmentation choices."""
+            if "Overall" in segmentation and len(segmentation) == 1:
+                return "Low complexity - overall monitoring only"
+            elif len(segmentation) <= 2:
+                return "Medium complexity - manageable segmentation"
+            elif len(segmentation) <= 4:
+                return "High complexity - consider monitoring tools and dashboards"
+            else:
+                return "Very high complexity - requires dedicated monitoring infrastructure"
+        
+        def _analyze_segmentation_implications(self, segmentation: List[str]) -> str:
+            """Analyze the implications of chosen segmentation."""
+            implications = []
+            
+            if "Overall" in segmentation:
+                implications.append("Overall monitoring provides baseline performance")
+            
+            if "NTA vs. Repeat" in segmentation:
+                implications.append("Customer type segmentation - useful for understanding new vs. existing customer behavior")
+            
+            if "FICO Bands" in segmentation:
+                implications.append("Credit quality segmentation - important for risk assessment and approval patterns")
+            
+            if "AOV Bands" in segmentation:
+                implications.append("Transaction value segmentation - useful for understanding spending behavior")
+            
+            if "ITACS Bands" in segmentation:
+                implications.append("Income segmentation - important for affordability and loan sizing")
+            
+            if "Loan Type (IB vs. 0%)" in segmentation:
+                implications.append("Product segmentation - critical for understanding product preference and performance")
+            
+            if len(implications) == 1:
+                return implications[0]
+            else:
+                return "Multiple segmentation approaches: " + "; ".join(implications)
+        
+        def generate_populated_sql(self) -> str:
+            """Generate a populated SQL query based on questionnaire responses."""
+            if not self.responses:
+                raise ValueError("No responses available. Please complete the questionnaire first.")
+            
+            # Extract key parameters from responses
+            merchant_aris = self.responses.get("merchant_aris", "")
+            ari_type = self.responses.get("ari_type", "")
+            test_start_date = self.responses.get("test_start_date", "")
+            test_end_date = self.responses.get("test_end_date", "")
+            control_start_date = self.responses.get("control_start_date", "")
+            control_end_date = self.responses.get("control_end_date", "")
+            
+            # Parse merchant ARIs into list format
+            if merchant_aris:
+                ari_list = [ari.strip() for ari in merchant_aris.split(',')]
+                ari_list_str = "', '".join(ari_list)
+            else:
+                ari_list_str = ""
+            
+            # Determine the WHERE clause based on ARI type
+            if ari_type == "Merchant ARIs":
+                where_clause = f"md.merchant_ari IN ('{ari_list_str}')"
+            elif ari_type == "Merchant Partner ARIs":
+                where_clause = f"md.merchant_partner_ari IN ('{ari_list_str}')"
+            else:
+                where_clause = f"md.merchant_ari IN ('{ari_list_str}') OR md.merchant_partner_ari IN ('{ari_list_str}')"
+            
+            # Generate the SQL query
+            sql_query = f"""SELECT
+-- Generated from questionnaire responses --
+-- Experiment: {self.responses.get('experiment_description', 'N/A')}
+-- Control Period: {control_start_date} to {control_end_date}
+-- Test Period: {test_start_date} to {test_end_date}
+
+CASE 
+    WHEN to_date(cfv5.CHECKOUT_CREATED_DT) BETWEEN '{control_start_date}' AND '{control_end_date}' THEN 'Pre'
+    WHEN to_date(cfv5.CHECKOUT_CREATED_DT) BETWEEN '{test_start_date}' AND '{test_end_date}' THEN 'Post'
+    ELSE 'Other'
+END AS analysis_period
+
+, CASE WHEN cfv5.USER_ARI IS NULL THEN 'UNKNOWN'
+    WHEN cfv5.USER_ARI IS NOT NULL THEN 'EXISTING'
+    ELSE 'OTHER' END AS user_status
     
+, CASE 
+  WHEN cfv5.TOTAL_AMOUNT < 100 THEN '1|<$100'
+  WHEN cfv5.TOTAL_AMOUNT >= 100 AND cfv5.TOTAL_AMOUNT < 250 THEN '2|$100-250'
+  WHEN cfv5.TOTAL_AMOUNT >= 250 AND cfv5.TOTAL_AMOUNT < 500 THEN '3|$250-500'
+  WHEN cfv5.TOTAL_AMOUNT >= 500 AND cfv5.TOTAL_AMOUNT < 1000 THEN '4|$500-1000'
+  WHEN cfv5.TOTAL_AMOUNT >= 1000 THEN '5|$1000+'
+  ELSE '6|Other'
+END AS AOV_bucket
+
+, CASE
+        WHEN cfv5.ITACS_V1 >= 98 then '1: 98+'
+        WHEN cfv5.ITACS_V1 >= 96 then '2: 96+'
+        WHEN cfv5.ITACS_V1 >= 95 then '3: 95-96'
+        WHEN cfv5.ITACS_V1 >= 94 then '4: 94-95'
+        WHEN cfv5.ITACS_V1 IS NOT NULL AND cfv5.ITACS_V1 < 94 THEN '5: < 94'
+        ELSE 'Unknown'
+    END as itacs_bucket
+
+, CASE WHEN cfv5.LOAN_TYPE = 'affirm_go_v3' THEN 'Split Pay'
+  ELSE 'IB' END as loan_type_checkout
+ 
+, count(distinct cfv5.CHECKOUT_ARI) as checkouts
+, count(distinct case when cfv5.IS_LOGIN_AUTHENTICATED = 1 then cfv5.CHECKOUT_ARI end) as authenticated
+, count(distinct case when cfv5.IS_IDENTITY_APPROVED = 1 then cfv5.CHECKOUT_ARI end) as identity_approved 
+, count(distinct case when cfv5.IS_FRAUD_APPROVED = 1 then cfv5.CHECKOUT_ARI end) as fraud_approved 
+, count(distinct case when cfv5.IS_CHECKOUT_APPLIED = 1 then cfv5.CHECKOUT_ARI end) as applied
+, count(distinct case when cfv5.IS_APPROVED = 1 then cfv5.CHECKOUT_ARI end) as approved_checkouts 
+, count(distinct case when cfv5.IS_CONFIRMED = 1 then cfv5.CHECKOUT_ARI end) as confirmed_checkouts
+, count(distinct case when cfv5.IS_AUTHED = 1 then cfv5.CHECKOUT_ARI end) as authed_checkouts
+, sum(case when cfv5.IS_AUTHED = 1 then cfv5.TOTAL_AMOUNT end) as GMV
+, COALESCE(authenticated,0) / NULLIF(checkouts,0) as authentication_rate
+, COALESCE(identity_approved,0) / NULLIF(authenticated,0) as identity_approval_rate
+, COALESCE(fraud_approved,0) / NULLIF(authenticated,0) as fraud_approval_rate
+, COALESCE(applied,0) / NULLIF(checkouts,0) as application_rate
+, COALESCE(approved_checkouts,0) / NULLIF(applied,0) as credit_approval_rate
+, COALESCE(confirmed_checkouts,0) / NULLIF(approved_checkouts,0) as confirmation_rate
+, COALESCE(authed_checkouts,0) / NULLIF(confirmed_checkouts,0) as authorization_rate
+, COALESCE(authed_checkouts,0) / NULLIF(checkouts,0) as E2E
+, COALESCE(SUM(CASE WHEN cfv5.IS_AUTHED = 1 THEN cfv5.TOTAL_AMOUNT END),0)/ NULLIF(authed_checkouts,0) as AOV
+
+from prod__us.dbt_analytics.checkout_funnel_v5 cfv5
+left join prod__us.dbt_analytics.merchant_dim md on md.merchant_ari = cfv5.MERCHANT_ARI
+
+-- Filter based on questionnaire responses --
+WHERE {where_clause}
+
+group by all
+"""
+            
+            return sql_query
+        
+        def save_sql_query(self, filename: str = None) -> str:
+            """Save the generated SQL query to a file."""
+            if not filename:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"experiment_query_{timestamp}.sql"
+            
+            try:
+                sql_content = self.generate_populated_sql()
+                with open(filename, 'w') as f:
+                    f.write(sql_content)
+                return filename
+            except Exception as e:
+                raise Exception(f"Failed to save SQL query: {e}")
+        
+        def test_snowflake_connection(self) -> dict:
+            """Test Snowflake connection and list available tables."""
+            try:
+                import snowflake.connector
+                from snowflake.connector import connect
+                
+                # Get connection parameters from environment or config
+                account = os.environ.get('SNOWFLAKE_ACCOUNT')
+                user = os.environ.get('SNOWFLAKE_USER')
+                authenticator = os.environ.get('SNOWFLAKE_AUTHENTICATOR', 'externalbrowser')
+                warehouse = os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH')
+                database = os.environ.get('SNOWFLAKE_DATABASE', 'PROD__US')
+                schema = os.environ.get('SNOWFLAKE_SCHEMA', 'DBT_ANALYTICS')
+                
+                if not all([account, user]):
+                    raise Exception("Snowflake connection parameters not found. Please set SNOWFLAKE_ACCOUNT and SNOWFLAKE_USER environment variables.")
+                
+                # Connect to Snowflake
+                conn = connect(
+                    account=account,
+                    user=user,
+                    authenticator=authenticator,
+                    warehouse=warehouse,
+                    database=database,
+                    schema=schema
+                )
+                
+                cursor = conn.cursor()
+                
+                # Ensure warehouse is active
+                cursor.execute(f"USE WAREHOUSE {warehouse}")
+                cursor.execute(f"USE DATABASE {database}")
+                cursor.execute(f"USE SCHEMA {schema}")
+                
+                # Test simple query to verify connection
+                cursor.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_WAREHOUSE()")
+                connection_info = cursor.fetchone()
+                
+                # List available tables in the schema
+                cursor.execute(f"SHOW TABLES IN {database}.{schema}")
+                tables = cursor.fetchall()
+                
+                cursor.close()
+                conn.close()
+                
+                return {
+                    'success': True,
+                    'connection_info': {
+                        'database': connection_info[0],
+                        'schema': connection_info[1],
+                        'warehouse': connection_info[2]
+                    },
+                    'available_tables': [table[1] for table in tables] if tables else []
+                }
+                
+            except ImportError:
+                return {
+                    'success': False,
+                    'error': 'Snowflake connector not installed. Please install with: pip install snowflake-connector-python'
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f'Failed to test Snowflake connection: {str(e)}'
+                }
+        
+        def execute_sql_query(self) -> dict:
+            """Execute the generated SQL query against Snowflake and return results."""
+            try:
+                import snowflake.connector
+                from snowflake.connector import connect
+                
+                # Get connection parameters from environment or config
+                account = os.environ.get('SNOWFLAKE_ACCOUNT')
+                user = os.environ.get('SNOWFLAKE_USER')
+                authenticator = os.environ.get('SNOWFLAKE_AUTHENTICATOR', 'externalbrowser')
+                warehouse = os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH')
+                database = os.environ.get('SNOWFLAKE_DATABASE', 'PROD__US')
+                schema = os.environ.get('SNOWFLAKE_SCHEMA', 'DBT_ANALYTICS')
+                
+                if not all([account, user]):
+                    raise Exception("Snowflake connection parameters not found. Please set SNOWFLAKE_ACCOUNT and SNOWFLAKE_USER environment variables.")
+                
+                # Connect to Snowflake
+                conn = connect(
+                    account=account,
+                    user=user,
+                    authenticator=authenticator,
+                    warehouse=warehouse,
+                    database=database,
+                    schema=schema
+                )
+                
+                # Execute the query
+                sql_query = self.generate_populated_sql()
+                cursor = conn.cursor()
+                
+                # Ensure warehouse is active
+                cursor.execute(f"USE WAREHOUSE {warehouse}")
+                cursor.execute(f"USE DATABASE {database}")
+                cursor.execute(f"USE SCHEMA {schema}")
+                
+                cursor.execute(sql_query)
+                
+                # Fetch results
+                results = cursor.fetchall()
+                column_names = [desc[0] for desc in cursor.description]
+                
+                # Convert to list of dictionaries
+                data = []
+                for row in results:
+                    data.append(dict(zip(column_names, row)))
+                
+                cursor.close()
+                conn.close()
+                
+                return {
+                    'success': True,
+                    'data': data,
+                    'row_count': len(data),
+                    'columns': column_names,
+                    'sql_query': sql_query
+                }
+                
+            except ImportError:
+                return {
+                    'success': False,
+                    'error': 'Snowflake connector not installed. Please install with: pip install snowflake-connector-python'
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'error': f'Failed to execute SQL query: {str(e)}'
+                }
+        
+        def analyze_experiment_results(self, results: dict) -> dict:
+            """Analyze the experiment results from SQL execution."""
+            if not results.get('success'):
+                return {'error': results.get('error', 'Unknown error')}
+            
+            data = results['data']
+            if not data:
+                return {'warning': 'No data returned from query'}
+            
+            # Debug: Print the first few rows to see the data structure
+            print(f"\n🔍 DEBUG: Data structure analysis")
+            print(f"📊 Total rows: {len(data)}")
+            if data:
+                print(f"📋 Sample row keys: {list(data[0].keys())}")
+                print(f"📋 Sample row values: {data[0]}")
+            
+            analysis = {
+                'summary_stats': {},
+                'control_vs_test': {},
+                'key_insights': [],
+                'recommendations': []
+            }
+            
+            # Separate control and test data
+            control_data = [row for row in data if row.get('ANALYSIS_PERIOD') == 'Pre']
+            test_data = [row for row in data if row.get('ANALYSIS_PERIOD') == 'Post']
+            
+            print(f"🔍 DEBUG: Control data rows: {len(control_data)}, Test data rows: {len(test_data)}")
+            if control_data:
+                print(f"🔍 DEBUG: Control data sample: {control_data[0]}")
+            if test_data:
+                print(f"🔍 DEBUG: Test data sample: {test_data[0]}")
+            
+            # Calculate summary statistics
+            if control_data:
+                analysis['summary_stats']['control'] = {
+                    'total_checkouts': sum(row.get('CHECKOUTS', 0) or 0 for row in control_data),
+                    'total_gmv': sum(row.get('GMV', 0) or 0 for row in control_data),
+                    'avg_e2e_rate': sum(row.get('E2E', 0) or 0 for row in control_data) / len(control_data) if control_data else 0,
+                    'avg_aov': sum(row.get('AOV', 0) or 0 for row in control_data) / len(control_data) if control_data else 0
+                }
+            
+            if test_data:
+                analysis['summary_stats']['test'] = {
+                    'total_checkouts': sum(row.get('CHECKOUTS', 0) or 0 for row in test_data),
+                    'total_gmv': sum(row.get('GMV', 0) or 0 for row in test_data),
+                    'avg_e2e_rate': sum(row.get('E2E', 0) or 0 for row in test_data) / len(test_data) if test_data else 0,
+                    'avg_aov': sum(row.get('AOV', 0) or 0 for row in test_data) / len(test_data) if test_data else 0
+                }
+            
+            # Calculate control vs test comparisons
+            if control_data and test_data:
+                control_stats = analysis['summary_stats']['control']
+                test_stats = analysis['summary_stats']['test']
+                
+                # Calculate percentage changes
+                checkout_change = ((test_stats['total_checkouts'] - control_stats['total_checkouts']) / control_stats['total_checkouts'] * 100) if control_stats['total_checkouts'] > 0 else 0
+                gmv_change = ((test_stats['total_gmv'] - control_stats['total_gmv']) / control_stats['total_gmv'] * 100) if control_stats['total_gmv'] > 0 else 0
+                e2e_change = ((test_stats['avg_e2e_rate'] - control_stats['avg_e2e_rate']) / control_stats['avg_e2e_rate'] * 100) if control_stats['avg_e2e_rate'] > 0 else 0
+                aov_change = ((test_stats['avg_aov'] - control_stats['avg_aov']) / control_stats['avg_aov'] * 100) if control_stats['avg_aov'] > 0 else 0
+                
+                analysis['control_vs_test'] = {
+                    'checkout_change_pct': round(checkout_change, 2),
+                    'gmv_change_pct': round(gmv_change, 2),
+                    'e2e_change_pct': round(e2e_change, 2),
+                    'aov_change_pct': round(aov_change, 2)
+                }
+                
+                # Generate insights
+                if checkout_change > 5:
+                    analysis['key_insights'].append(f"✅ Checkouts increased by {checkout_change:.1f}% during test period")
+                elif checkout_change < -5:
+                    analysis['key_insights'].append(f"⚠️ Checkouts decreased by {abs(checkout_change):.1f}% during test period")
+                
+                if gmv_change > 5:
+                    analysis['key_insights'].append(f"✅ GMV increased by {gmv_change:.1f}% during test period")
+                elif gmv_change < -5:
+                    analysis['key_insights'].append(f"⚠️ GMV decreased by {abs(gmv_change):.1f}% during test period")
+                
+                if e2e_change > 5:
+                    analysis['key_insights'].append(f"✅ E2E conversion improved by {e2e_change:.1f}% during test period")
+                elif e2e_change < -5:
+                    analysis['key_insights'].append(f"⚠️ E2E conversion declined by {abs(e2e_change):.1f}% during test period")
+                
+                # Generate recommendations
+                if gmv_change > 10 and e2e_change > 5:
+                    analysis['recommendations'].append("🎯 Strong positive results! Consider expanding the experiment")
+                elif gmv_change < -5 or e2e_change < -5:
+                    analysis['recommendations'].append("⚠️ Negative impact detected. Consider stopping the experiment")
+                else:
+                    analysis['recommendations'].append("📊 Mixed results. Continue monitoring and consider adjustments")
+            
+            return analysis
+        
+        def display_experiment_results(self, results: dict, analysis: dict):
+            """Display the experiment results and analysis."""
+            print("\n" + "=" * 80)
+            print("                    EXPERIMENT RESULTS ANALYSIS")
+            print("=" * 80)
+            
+            if 'error' in results:
+                print(f"❌ Error: {results['error']}")
+                return
+            
+            if 'warning' in analysis:
+                print(f"⚠️ Warning: {analysis['warning']}")
+                return
+            
+            print(f"📊 Data Retrieved: {results['row_count']} rows")
+            print(f"📋 Columns: {', '.join(results['columns'])}")
+            
+            if 'summary_stats' in analysis:
+                print("\n📈 SUMMARY STATISTICS:")
+                print("-" * 50)
+                
+                if 'control' in analysis['summary_stats']:
+                    control = analysis['summary_stats']['control']
+                    print("Control Period (Pre):")
+                    print(f"  • Total Checkouts: {control['total_checkouts']:,}")
+                    print(f"  • Total GMV: ${control['total_gmv']:,.2f}")
+                    print(f"  • Avg E2E Rate: {control['avg_e2e_rate']:.3f}")
+                    print(f"  • Avg AOV: ${control['avg_aov']:.2f}")
+                
+                if 'test' in analysis['summary_stats']:
+                    test = analysis['summary_stats']['test']
+                    print("\nTest Period (Post):")
+                    print(f"  • Total Checkouts: {test['total_checkouts']:,}")
+                    print(f"  • Total GMV: ${test['total_gmv']:,.2f}")
+                    print(f"  • Avg E2E Rate: {test['avg_e2e_rate']:.3f}")
+                    print(f"  • Avg AOV: ${test['avg_aov']:.2f}")
+            
+            if 'control_vs_test' in analysis:
+                print("\n🔄 CONTROL VS TEST COMPARISON:")
+                print("-" * 50)
+                comp = analysis['control_vs_test']
+                print(f"  • Checkout Change: {comp['checkout_change_pct']:+.1f}%")
+                print(f"  • GMV Change: {comp['gmv_change_pct']:+.1f}%")
+                print(f"  • E2E Conversion Change: {comp['e2e_change_pct']:+.1f}%")
+                print(f"  • AOV Change: {comp['aov_change_pct']:+.1f}%")
+            
+            if 'key_insights' in analysis:
+                print("\n💡 KEY INSIGHTS:")
+                print("-" * 50)
+                for insight in analysis['key_insights']:
+                    print(f"  {insight}")
+            
+            if 'recommendations' in analysis:
+                print("\n🎯 RECOMMENDATIONS:")
+                print("-" * 50)
+                for rec in analysis['recommendations']:
+                    print(f"  {rec}")
+            
+            print("\n" + "=" * 80)
+     
     return ExperimentMonitoringQuestionnaire
 
 def run_experiment_questionnaire():
