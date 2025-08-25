@@ -1,12 +1,11 @@
 SELECT
--- need to have these dates based on the input from the questionnaire -- 
+-- Generated from questionnaire responses --
 
 CASE 
-    WHEN to_date(cfv5.checkout_created_dt) BETWEEN '{pre_start_date}' AND '{pre_end_date}' THEN 'Pre'
-    WHEN to_date(cfv5.checkout_created_dt) BETWEEN '{post_start_date}' AND '{post_end_date}' THEN 'Post'
+    WHEN to_date(cfv5.checkout_created_dt) BETWEEN '2025-01-01' AND '2025-01-31' THEN 'Pre'
+    WHEN to_date(cfv5.checkout_created_dt) BETWEEN '2025-02-01' AND '2025-02-28' THEN 'Post'
     ELSE 'Other'
 END AS analysis_period
-
 
 , CASE WHEN cfv5.user_ari IS NULL THEN 'UNKNOWN'
     WHEN to_date(cfv5.checkout_created_dt) <= coalesce(to_date(person_first_authed_charge_created_dt),current_date+1) THEN 'NEW'
@@ -41,10 +40,8 @@ END AS AOV_bucket
         ELSE 'Unknown'
     END as itacs_bucket
 
-
-, CASE when cfv5.loan_type = 'affirm_go_v3' then 'PI4' 
-         when cfv5.loan_type = 'classic' and cfv5.apr > 0 then 'IB'
-         when cfv5.loan_type = 'classic' and cfv5.apr = 0 then '0pct' end as loan_type_checkout, 
+, CASE WHEN cfv5.loan_type = 'affirm_go_v3' THEN 'Split Pay'
+  ELSE 'IB' END as loan_type_checkout
  
 , count(distinct cfv5.checkout_ari) as checkouts
 , count(distinct case when cfv5.is_login_authenticated = 1 then cfv5.checkout_ari end) as authenticated
@@ -65,13 +62,12 @@ END AS AOV_bucket
 , COALESCE(authed_checkouts,0) / NULLIF(checkouts,0) as E2E
 , COALESCE(SUM(CASE WHEN cfv5.is_authed = 1 THEN cfv5.total_amount END),0)/ NULLIF(authed_checkouts,0) as AOV
 
-
 from prod__us.dbt_analytics.checkout_funnel_v5 cfv5
 left join prod__us.dbt_analytics.merchant_dim md on md.merchant_ari = cfv5.merchant_ari
 left join prod__us.dbt_analytics.user_dim on cfv5.user_ari = user_dim.user_ari
 left join prod__us.dbt_analytics.person_stats_mart on user_dim.person_uuid = person_stats_mart.person_uuid
 
--- need to have this based on the input from the questionnaire -- 
-WHERE md.merchant_ari IN ({merchant_ari_list}) OR md.merchant_partner_ari IN ({merchant_ari_list})
+-- Corrected WHERE clause for merchant partner ARI --
+WHERE md.merchant_partner_ari IN ('8KW036FXMM8KVXHC')
 
-group by all 
+group by all
