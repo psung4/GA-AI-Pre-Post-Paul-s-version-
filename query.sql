@@ -41,7 +41,7 @@ END AS AOV_bucket
         ELSE 'Unknown'
     END as itacs_bucket
 
-, CASE WHEN cfv5.loan_type = 'affirm_go_v3' THEN 'Split Pay'
+, CASE WHEN cfv5.loan_type = 'affirm_go_v3' THEN '0%'
   ELSE 'IB' END as loan_type_checkout
  
 , count(distinct cfv5.checkout_ari) as checkouts
