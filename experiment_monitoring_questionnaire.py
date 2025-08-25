@@ -78,7 +78,8 @@ def create_experiment_monitoring_questions():
                 "% Prime+ Population",
                 "Median ITACS",
                 "Terms distribution",
-                "% Z-term"
+                "% Z-term",
+                "All metrics from above"
             ],
             "required": True
         },
@@ -220,8 +221,13 @@ def create_experiment_questionnaire_class():
             metrics = self.responses.get("metrics_to_monitor", [])
             if metrics:
                 all_metrics = self._compile_all_metrics(metrics, "")
+                # Check if "All metrics from above" was selected
+                all_selected = "All metrics from above" in metrics
+                
                 self.analysis_results["metrics_analysis"] = {
                     "selected_metrics": metrics,
+                    "all_metrics_selected": all_selected,
+                    "compiled_metrics": all_metrics,
                     "total_metrics": len(all_metrics),
                     "metric_categories": self._categorize_metrics(all_metrics),
                     "monitoring_complexity": self._assess_monitoring_complexity(len(all_metrics)),
@@ -676,8 +682,17 @@ def create_experiment_questionnaire_class():
                 f.write("METRICS TO MONITOR\n")
                 f.write("-" * 40 + "\n")
                 metrics = self.responses.get("metrics_to_monitor", [])
-                for i, metric in enumerate(metrics, 1):
-                    f.write(f"{i}. {metric}\n")
+                
+                # Check if "All metrics from above" was selected
+                if "All metrics from above" in metrics:
+                    f.write("✅ All metrics from above selected\n")
+                    f.write("   This includes all individual metrics:\n")
+                    all_compiled_metrics = self._compile_all_metrics(metrics, "")
+                    for i, metric in enumerate(all_compiled_metrics, 1):
+                        f.write(f"   {i}. {metric}\n")
+                else:
+                    for i, metric in enumerate(metrics, 1):
+                        f.write(f"{i}. {metric}\n")
                 f.write("\n")
                 
                 # Segmentation
@@ -913,6 +928,32 @@ def create_experiment_questionnaire_class():
         def _compile_all_metrics(self, selected_metrics: List[str], custom_metrics: str) -> List[str]:
             """Compile all metrics for analysis."""
             all_metrics = selected_metrics.copy()
+            
+            # Handle "All metrics from above" selection
+            if "All metrics from above" in all_metrics:
+                # Remove the "All metrics from above" option
+                all_metrics.remove("All metrics from above")
+                # Add all individual metrics
+                individual_metrics = [
+                    "Authed GMV",
+                    "Checkouts",
+                    "E2E Conversion",
+                    "AOV",
+                    "Application Rate",
+                    "Authentication Rate",
+                    "Approval Rate",
+                    "Take-up Rate",
+                    "Auth Rate",
+                    "Median FICO",
+                    "% Prime+ Population",
+                    "Median ITACS",
+                    "Terms distribution",
+                    "% Z-term"
+                ]
+                # Add individual metrics (avoiding duplicates)
+                for metric in individual_metrics:
+                    if metric not in all_metrics:
+                        all_metrics.append(metric)
             
             # Remove any "Other" options if they exist
             
