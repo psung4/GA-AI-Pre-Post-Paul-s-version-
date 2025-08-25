@@ -43,8 +43,8 @@ END AS AOV_bucket
 
 
 , CASE when cfv5.loan_type = 'affirm_go_v3' then 'PI4' 
-         when cfv5.loan_type = 'classic' and cf.apr > 0 then 'IB'
-         when cfv5.loan_type = 'classic' and cf.apr = 0 then '0pct' end as loan_type_checkout, 
+         when cfv5.loan_type = 'classic' and cfv5.apr > 0 then 'IB'
+         when cfv5.loan_type = 'classic' and cfv5.apr = 0 then '0pct' end as loan_type_checkout, 
  
 , count(distinct cfv5.checkout_ari) as checkouts
 , count(distinct case when cfv5.is_login_authenticated = 1 then cfv5.checkout_ari end) as authenticated
