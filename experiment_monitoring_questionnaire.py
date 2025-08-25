@@ -78,17 +78,11 @@ def create_experiment_monitoring_questions():
                 "% Prime+ Population",
                 "Median ITACS",
                 "Terms distribution",
-<<<<<<< HEAD
                 "% Z-term"
-=======
-                "% Z-term",
-                "Other (specify below)"
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
             ],
             "required": True
         },
         {
-<<<<<<< HEAD
             "id": "monitoring_segmentation",
             "question": "7. What segmentation should we use for monitoring?",
             "type": "multi_select",
@@ -108,45 +102,6 @@ def create_experiment_monitoring_questions():
             "type": "text",
             "required": False,
             "help_text": "This could include experiment goals, success criteria, business context, expected outcomes, or any other information that would help interpret the results."
-=======
-            "id": "custom_metrics",
-            "question": "If you selected 'Other', please specify the metrics:",
-            "type": "text",
-            "required": False
-        },
-        {
-            "id": "experiment_goals",
-            "question": "What are the primary goals of this experiment?",
-            "type": "multi_select",
-            "options": [
-                "Increase conversion rates",
-                "Improve user engagement",
-                "Reduce customer acquisition costs",
-                "Increase average order value",
-                "Improve customer satisfaction",
-                "Test new features or designs",
-                "Optimize pricing strategy",
-                "Improve checkout process",
-                "Test APR/pricing changes",
-                "Improve credit approval rates",
-                "Increase loan take-up",
-                "Optimize risk assessment",
-                "Other (specify below)"
-            ],
-            "required": False
-        },
-        {
-            "id": "custom_goals",
-            "question": "If you selected 'Other' for goals, please specify:",
-            "type": "text",
-            "required": False
-        },
-        {
-            "id": "success_criteria",
-            "question": "What would you consider a successful outcome for this experiment?",
-            "type": "text",
-            "required": False
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
         }
     ]
     
@@ -263,26 +218,16 @@ def create_experiment_questionnaire_class():
             
             # Metrics Analysis
             metrics = self.responses.get("metrics_to_monitor", [])
-<<<<<<< HEAD
             if metrics:
                 all_metrics = self._compile_all_metrics(metrics, "")
                 self.analysis_results["metrics_analysis"] = {
                     "selected_metrics": metrics,
-=======
-            custom_metrics = self.responses.get("custom_metrics", "")
-            if metrics or custom_metrics:
-                all_metrics = self._compile_all_metrics(metrics, custom_metrics)
-                self.analysis_results["metrics_analysis"] = {
-                    "selected_metrics": metrics,
-                    "custom_metrics": custom_metrics,
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
                     "total_metrics": len(all_metrics),
                     "metric_categories": self._categorize_metrics(all_metrics),
                     "monitoring_complexity": self._assess_monitoring_complexity(len(all_metrics)),
                     "metric_descriptions": {metric: self._get_metric_description(metric) for metric in all_metrics}
                 }
             
-<<<<<<< HEAD
             # Monitoring Segmentation Analysis
             segmentation = self.responses.get("monitoring_segmentation", [])
             if segmentation:
@@ -300,27 +245,6 @@ def create_experiment_questionnaire_class():
                     "context": additional_context,
                     "context_length": len(additional_context),
                     "context_clarity": self._assess_description_clarity(additional_context)
-=======
-            # Experiment Goals Analysis
-            goals = self.responses.get("experiment_goals", [])
-            custom_goals = self.responses.get("custom_goals", "")
-            if goals or custom_goals:
-                all_goals = self._compile_all_goals(goals, custom_goals)
-                self.analysis_results["goals_analysis"] = {
-                    "selected_goals": goals,
-                    "custom_goals": custom_goals,
-                    "total_goals": len(all_goals),
-                    "goal_alignment": self._assess_goal_alignment(all_goals, metrics)
-                }
-            
-            # Success Criteria Analysis
-            success_criteria = self.responses.get("success_criteria")
-            if success_criteria:
-                self.analysis_results["success_criteria_analysis"] = {
-                    "criteria": success_criteria,
-                    "measurability": self._assess_measurability(success_criteria),
-                    "alignment_with_metrics": self._assess_criteria_metric_alignment(success_criteria, metrics)
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
                 }
             
             # Generate overall assessment
@@ -591,7 +515,6 @@ def create_experiment_questionnaire_class():
                 for rec in overall.get('key_recommendations', []):
                     print(f"  • {rec}")
         
-<<<<<<< HEAD
         def _ask_save_format(self) -> str:
             """Ask user for their preferred save format."""
             print("\n" + "=" * 60)
@@ -648,14 +571,6 @@ def create_experiment_questionnaire_class():
         
         def _save_json(self, filename: str):
             """Save results to a JSON file."""
-=======
-        def save_results(self, filename: Optional[str] = None):
-            """Save results to a JSON file."""
-            if not filename:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"experiment_monitoring_{timestamp}.json"
-            
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
             results = {
                 "timestamp": datetime.now().isoformat(),
                 "question_set": "experiment_monitoring",
@@ -668,7 +583,6 @@ def create_experiment_questionnaire_class():
                 "analysis": self.analysis_results
             }
             
-<<<<<<< HEAD
             with open(filename, 'w') as f:
                 json.dump(results, f, indent=2)
         
@@ -794,14 +708,6 @@ def create_experiment_questionnaire_class():
                     f.write("Key Recommendations:\n")
                     for rec in overall.get('key_recommendations', []):
                         f.write(f"• {rec}\n")
-=======
-            try:
-                with open(filename, 'w') as f:
-                    json.dump(results, f, indent=2)
-                print(f"\nResults saved to: {filename}")
-            except Exception as e:
-                print(f"Error saving results: {e}")
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
         
         def conduct_questionnaire(self):
             """Conduct the experiment monitoring questionnaire with validation."""
@@ -1008,19 +914,7 @@ def create_experiment_questionnaire_class():
             """Compile all metrics for analysis."""
             all_metrics = selected_metrics.copy()
             
-<<<<<<< HEAD
             # Remove any "Other" options if they exist
-            if "Other (specify below)" in all_metrics:
-                all_metrics.remove("Other (specify below)")
-=======
-            if custom_metrics and "Other" in selected_metrics:
-                # Parse custom metrics (assuming comma-separated or newline-separated)
-                custom_list = [metric.strip() for metric in custom_metrics.replace('\n', ',').split(',') if metric.strip()]
-                all_metrics.extend(custom_list)
-                # Remove the placeholder "Other" option
-                if "Other (specify below)" in all_metrics:
-                    all_metrics.remove("Other (specify below)")
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
             
             return all_metrics
         
@@ -1089,8 +983,6 @@ def create_experiment_questionnaire_class():
                 custom_list = [goal.strip() for goal in custom_goals.replace('\n', ',').split(',') if goal.strip()]
                 all_goals.extend(custom_list)
                 # Remove the placeholder "Other" option
-                if "Other (specify below)" in selected_goals:
-                    all_goals.remove("Other (specify below)")
             
             return all_goals
         
@@ -1190,7 +1082,6 @@ def create_experiment_questionnaire_class():
                 # Save results
                 save_choice = input("\nWould you like to save the results? (y/n): ").lower()
                 if save_choice in ['y', 'yes']:
-<<<<<<< HEAD
                     # Ask for format preference
                     format_type = self._ask_save_format()
                     
@@ -1200,12 +1091,6 @@ def create_experiment_questionnaire_class():
                     
                     # Save in the chosen format
                     self.save_results(filename, format_type)
-=======
-                    filename = input("Enter filename (or press Enter for default): ").strip()
-                    if not filename:
-                        filename = None
-                    self.save_results(filename)
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
                 
                 print("\nExperiment monitoring setup complete! Thank you for using the questionnaire tool.")
                 
@@ -1231,7 +1116,7 @@ def create_experiment_questionnaire_class():
             # Metrics complexity
             metrics_count = len(self._compile_all_metrics(
                 self.responses.get("metrics_to_monitor", []),
-                self.responses.get("custom_metrics", "")
+                ""
             ))
             if metrics_count > 10:
                 complexity_score += 2
@@ -1288,8 +1173,8 @@ def create_experiment_questionnaire_class():
             if metrics_count > 10:
                 recommendations.append("Many metrics - consider grouping or prioritization")
             
-            if not self.responses.get("success_criteria"):
-                recommendations.append("Define clear success criteria for better experiment evaluation")
+            if not self.responses.get("additional_context"):
+                recommendations.append("Provide additional context for better experiment evaluation")
             
             # Add ARI type specific recommendations
             ari_type = self.responses.get("ari_type", "")
@@ -1303,7 +1188,6 @@ def create_experiment_questionnaire_class():
                 "key_recommendations": recommendations,
                 "experiment_readiness": "Ready" if complexity_level != "High" else "Needs Planning"
             }
-<<<<<<< HEAD
         
         def _assess_segmentation_complexity(self, segmentation: List[str]) -> str:
             """Assess the complexity of monitoring based on segmentation choices."""
@@ -1342,8 +1226,6 @@ def create_experiment_questionnaire_class():
                 return implications[0]
             else:
                 return "Multiple segmentation approaches: " + "; ".join(implications)
-=======
->>>>>>> 1289b9d24c3b71ad639d2887103af21e74c68ae1
     
     return ExperimentMonitoringQuestionnaire
 
