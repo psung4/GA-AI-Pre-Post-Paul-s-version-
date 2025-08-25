@@ -10,7 +10,7 @@ control periods, and metrics.
 from enhanced_questionnaire import EnhancedAnalysisQuestionnaire
 from questionnaire_config import create_custom_question_set, validate_question_format
 from typing import List, Dict, Any, Optional
-import datetime
+from datetime import datetime
 import json
 
 def create_experiment_monitoring_questions():
@@ -65,20 +65,20 @@ def create_experiment_monitoring_questions():
             "question": "6. What metrics would you like to monitor?",
             "type": "multi_select",
             "options": [
-                "Conversion Rate",
-                "Revenue per User",
-                "Average Order Value",
-                "Customer Acquisition Cost",
-                "Customer Lifetime Value",
-                "Click-through Rate",
-                "Bounce Rate",
-                "Session Duration",
-                "Page Views per Session",
-                "Return on Ad Spend (ROAS)",
-                "Cost per Acquisition (CPA)",
-                "Customer Retention Rate",
-                "Net Promoter Score (NPS)",
-                "Customer Satisfaction Score",
+                "Authed GMV",
+                "Checkouts",
+                "E2E Conversion",
+                "AOV",
+                "Application Rate",
+                "Authentication Rate",
+                "Approval Rate",
+                "Take-up Rate",
+                "Auth Rate",
+                "Median FICO",
+                "% Prime+ Population",
+                "Median ITACS",
+                "Terms distribution",
+                "% Z-term",
                 "Other (specify below)"
             ],
             "required": True
@@ -102,6 +102,10 @@ def create_experiment_monitoring_questions():
                 "Test new features or designs",
                 "Optimize pricing strategy",
                 "Improve checkout process",
+                "Test APR/pricing changes",
+                "Improve credit approval rates",
+                "Increase loan take-up",
+                "Optimize risk assessment",
                 "Other (specify below)"
             ],
             "required": False
@@ -201,11 +205,15 @@ def create_experiment_questionnaire_class():
             test_start_date = self.responses.get("test_start_date", "")
             test_end_date = self.responses.get("test_end_date", "")
             if test_start_date and test_end_date:
+                # Validate test period dates
+                test_validation = self._validate_date_range(test_start_date, test_end_date)
+                
                 self.analysis_results["test_timing_analysis"] = {
                     "test_start_date": test_start_date,
                     "test_end_date": test_end_date,
                     "test_duration": self._calculate_date_duration(test_start_date, test_end_date),
-                    "timing_implications": self._analyze_test_timing(test_start_date, test_end_date)
+                    "timing_implications": self._analyze_test_timing(test_start_date, test_end_date),
+                    "date_validation": test_validation
                 }
             
             # Control Period Analysis
@@ -237,7 +245,8 @@ def create_experiment_questionnaire_class():
                     "custom_metrics": custom_metrics,
                     "total_metrics": len(all_metrics),
                     "metric_categories": self._categorize_metrics(all_metrics),
-                    "monitoring_complexity": self._assess_monitoring_complexity(len(all_metrics))
+                    "monitoring_complexity": self._assess_monitoring_complexity(len(all_metrics)),
+                    "metric_descriptions": {metric: self._get_metric_description(metric) for metric in all_metrics}
                 }
             
             # Experiment Goals Analysis
@@ -320,9 +329,9 @@ def create_experiment_questionnaire_class():
         def _analyze_test_timing(self, test_start_date: str, test_end_date: str) -> str:
             """Analyze the implications of test timing."""
             try:
-                start_date = datetime.datetime.strptime(test_start_date, "%Y-%m-%d")
-                end_date = datetime.datetime.strptime(test_end_date, "%Y-%m-%d")
-                today = datetime.datetime.now()
+                start_date = datetime.strptime(test_start_date, "%Y-%m-%d")
+                end_date = datetime.strptime(test_end_date, "%Y-%m-%d")
+                today = datetime.now()
                 
                 # Calculate days since test ended
                 days_since_end = (today - end_date).days
@@ -344,8 +353,8 @@ def create_experiment_questionnaire_class():
         def _analyze_control_period(self, control_start_date: str, control_end_date: str) -> str:
             """Analyze the statistical implications of control period."""
             try:
-                start_date = datetime.datetime.strptime(control_start_date, "%Y-%m-%d")
-                end_date = datetime.datetime.strptime(control_end_date, "%Y-%m-%d")
+                start_date = datetime.strptime(control_start_date, "%Y-%m-%d")
+                end_date = datetime.strptime(control_end_date, "%Y-%m-%d")
                 
                 # Calculate control period duration in days
                 control_duration = (end_date - start_date).days
@@ -369,8 +378,8 @@ def create_experiment_questionnaire_class():
         def _calculate_date_duration(self, start_date: str, end_date: str) -> str:
             """Calculate the duration between two dates."""
             try:
-                start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-                end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+                start = datetime.strptime(start_date, "%Y-%m-%d")
+                end = datetime.strptime(end_date, "%Y-%m-%d")
                 duration_days = (end - start).days
                 
                 if duration_days < 0:
@@ -410,10 +419,54 @@ def create_experiment_questionnaire_class():
         def _validate_date_format(self, date_string: str) -> bool:
             """Validate if a string is in YYYY-MM-DD format."""
             try:
-                datetime.datetime.strptime(date_string, "%Y-%m-%d")
+                datetime.strptime(date_string, "%Y-%m-%d")
                 return True
             except ValueError:
                 return False
+        
+        def _validate_date_range(self, start_date: str, end_date: str) -> Dict[str, Any]:
+            """Validate date range (start before end, not in future, not too old)."""
+            try:
+                start = datetime.strptime(start_date, "%Y-%m-%d")
+                end = datetime.strptime(end_date, "%Y-%m-%d")
+                today = datetime.now()
+                
+                validation_result = {
+                    "is_valid": True,
+                    "warnings": [],
+                    "errors": []
+                }
+                
+                # Check if start is before end
+                if start >= end:
+                    validation_result["is_valid"] = False
+                    validation_result["errors"].append("Start date must be before end date")
+                
+                # Check if dates are in the future
+                if start > today:
+                    validation_result["warnings"].append("Start date is in the future")
+                
+                if end > today:
+                    validation_result["warnings"].append("End date is in the future")
+                
+                # Check if dates are too old (more than 5 years ago)
+                five_years_ago = today.replace(year=today.year - 5)
+                if start < five_years_ago:
+                    validation_result["warnings"].append("Start date is more than 5 years ago")
+                
+                if end < five_years_ago:
+                    validation_result["warnings"].append("End date is more than 5 years ago")
+                
+                return validation_result
+                
+            except ValueError:
+                return {
+                    "is_valid": False,
+                    "warnings": [],
+                    "errors": ["Invalid date format"]
+                }
+        
+
         
         def display_analysis(self):
             """Display the analysis results for experiment monitoring."""
@@ -442,6 +495,29 @@ def create_experiment_questionnaire_class():
                                     print(f"    {sub_key.replace('_', ' ').title()}:")
                                     for item in sub_value:
                                         print(f"      • {item}")
+                                elif isinstance(sub_value, dict) and sub_key in ["date_validation", "timing_validation"]:
+                                    print(f"    {sub_key.replace('_', ' ').title()}:")
+                                    validation = sub_value
+                                    if validation.get("is_valid"):
+                                        if sub_key == "date_validation":
+                                            print(f"      ✓ Valid date range")
+                                        else:
+                                            print(f"      ✓ Valid timing relationship")
+                                    else:
+                                        if sub_key == "date_validation":
+                                            print(f"      ✗ Invalid date range")
+                                        else:
+                                            print(f"      ✗ Invalid timing relationship")
+                                    
+                                    if validation.get("warnings"):
+                                        print(f"      Warnings:")
+                                        for warning in validation["warnings"]:
+                                            print(f"        • {warning}")
+                                    
+                                    if validation.get("errors"):
+                                        print(f"      Errors:")
+                                        for error in validation["errors"]:
+                                            print(f"        • {error}")
                                 else:
                                     print(f"    {sub_key.replace('_', ' ').title()}: {sub_value}")
                         else:
@@ -465,11 +541,11 @@ def create_experiment_questionnaire_class():
         def save_results(self, filename: Optional[str] = None):
             """Save results to a JSON file."""
             if not filename:
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"experiment_monitoring_{timestamp}.json"
             
             results = {
-                "timestamp": datetime.datetime.now().isoformat(),
+                "timestamp": datetime.now().isoformat(),
                 "question_set": "experiment_monitoring",
                 "set_info": {
                     "name": "Experiment Monitoring Questionnaire",
@@ -488,7 +564,7 @@ def create_experiment_questionnaire_class():
                 print(f"Error saving results: {e}")
         
         def conduct_questionnaire(self):
-            """Conduct the experiment monitoring questionnaire."""
+            """Conduct the experiment monitoring questionnaire with validation."""
             if not self.questions:
                 print("No questions loaded. Please check questionnaire setup.")
                 return
@@ -498,7 +574,16 @@ def create_experiment_questionnaire_class():
             
             for i, question in enumerate(self.questions, 1):
                 print(f"\nQuestion {i} of {len(self.questions)}")
-                response = self.get_user_input(question)
+                print()
+                print(question["question"])
+                
+                if question["required"]:
+                    print("(Required)")
+                else:
+                    print("(Optional)")
+                
+                # Get validated response
+                response = self._get_validated_response(question, i)
                 self.responses[question["id"]] = response
                 
                 # Show progress
@@ -506,18 +591,137 @@ def create_experiment_questionnaire_class():
                 total = len(self.questions)
                 progress = (completed / total) * 100
                 print(f"\nProgress: {completed}/{total} questions completed ({progress:.1f}%)")
+                print()
             
             print("\n" + "=" * 60)
             print("           QUESTIONNAIRE COMPLETED!")
             print("=" * 60)
         
+        def _get_validated_response(self, question: Dict[str, Any], question_number: int) -> Any:
+            """Get user response with validation for date questions."""
+            while True:
+                # Get user input using the parent class method
+                response = self.get_user_input(question)
+                
+                # Validate date questions
+                if self._is_date_question(question):
+                    validation_result = self._validate_date_input(response, question, question_number)
+                    if validation_result["is_valid"]:
+                        # Show warnings if any
+                        if validation_result["warnings"]:
+                            print("\n⚠️  Warnings:")
+                            for warning in validation_result["warnings"]:
+                                print(f"   • {warning}")
+                        
+                        # Check for timing validation if we have enough dates
+                        timing_validation = self._validate_timing_relationship(question_number)
+                        if timing_validation and not timing_validation["is_valid"]:
+                            print("\n❌ CRITICAL TIMING ERROR:")
+                            for error in timing_validation["errors"]:
+                                print(f"   • {error}")
+                            print("\n🚫 You cannot proceed until this timing issue is fixed.")
+                            print("   The control period must end before the test period begins.")
+                            print("   Please correct the dates to fix this overlap.")
+                            continue
+                        
+                        return response
+                    else:
+                        print("\n❌ Validation Failed:")
+                        for error in validation_result["errors"]:
+                            print(f"   • {error}")
+                        print("\nPlease enter a valid date in YYYY-MM-DD format.")
+                        continue
+                
+                # For non-date questions, return immediately
+                return response
+        
+        def _is_date_question(self, question: Dict[str, Any]) -> bool:
+            """Check if a question is asking for a date."""
+            date_questions = ["test_start_date", "test_end_date", "control_start_date", "control_end_date"]
+            return question["id"] in date_questions
+        
+        def _validate_date_input(self, date_input: str, question: Dict[str, Any], question_number: int) -> Dict[str, Any]:
+            """Validate a single date input."""
+            # Basic format validation
+            if not self._validate_date_format(date_input):
+                return {
+                    "is_valid": False,
+                    "warnings": [],
+                    "errors": ["Invalid date format. Please use YYYY-MM-DD format (e.g., 2024-01-15)"]
+                }
+            
+            # Range validation for start/end date pairs
+            if question["id"] in ["test_start_date", "control_start_date"]:
+                # This is a start date, we'll validate the range when we get the end date
+                return {"is_valid": True, "warnings": [], "errors": []}
+            
+            elif question["id"] in ["test_end_date", "control_end_date"]:
+                # This is an end date, validate the range with the start date
+                if question["id"] == "test_end_date":
+                    start_date = self.responses.get("test_start_date", "")
+                else:  # control_end_date
+                    start_date = self.responses.get("control_start_date", "")
+                
+                if start_date:
+                    range_validation = self._validate_date_range(start_date, date_input)
+                    
+                    # Additional validation for control_end_date to prevent overlap with test period
+                    if question["id"] == "control_end_date":
+                        test_start = self.responses.get("test_start_date", "")
+                        if test_start:
+                            try:
+                                control_end_dt = datetime.strptime(date_input, "%Y-%m-%d")
+                                test_start_dt = datetime.strptime(test_start, "%Y-%m-%d")
+                                if control_end_dt >= test_start_dt:
+                                    range_validation["is_valid"] = False
+                                    range_validation["errors"].append(
+                                        "Control period end date cannot be on or after test period start date"
+                                    )
+                            except ValueError:
+                                pass
+                    
+                    return range_validation
+                else:
+                    return {"is_valid": True, "warnings": [], "errors": []}
+            
+            return {"is_valid": True, "warnings": [], "errors": []}
+        
+        def _validate_timing_relationship(self, current_question_number: int) -> Optional[Dict[str, Any]]:
+            """Validate timing relationship between control and test periods."""
+            # Validate as soon as we have enough information to detect overlaps
+            test_start = self.responses.get("test_start_date", "")
+            test_end = self.responses.get("test_end_date", "")
+            control_start = self.responses.get("control_start_date", "")
+            control_end = self.responses.get("control_end_date", "")
+            
+            # Check for overlaps as soon as we have the necessary date pairs
+            if current_question_number >= 5 and test_start and test_end:
+                # We have test period, check if control period overlaps
+                if control_start and control_end:
+                    return self._validate_experiment_timing(control_start, control_end, test_start, test_end)
+                elif control_start:
+                    # We have control start and test period, check if control start is after test start
+                    try:
+                        control_start_dt = datetime.strptime(control_start, "%Y-%m-%d")
+                        test_start_dt = datetime.strptime(test_start, "%Y-%m-%d")
+                        if control_start_dt >= test_start_dt:
+                            return {
+                                "is_valid": False,
+                                "warnings": [],
+                                "errors": ["Control period start date cannot be on or after test period start date"]
+                            }
+                    except ValueError:
+                        pass
+            
+            return None
+        
         def _validate_experiment_timing(self, control_start: str, control_end: str, test_start: str, test_end: str) -> Dict[str, Any]:
             """Validate the timing relationship between control and test periods."""
             try:
-                control_start_dt = datetime.datetime.strptime(control_start, "%Y-%m-%d")
-                control_end_dt = datetime.datetime.strptime(control_end, "%Y-%m-%d")
-                test_start_dt = datetime.datetime.strptime(test_start, "%Y-%m-%d")
-                test_end_dt = datetime.datetime.strptime(test_end, "%Y-%m-%d")
+                control_start_dt = datetime.strptime(control_start, "%Y-%m-%d")
+                control_end_dt = datetime.strptime(control_end, "%Y-%m-%d")
+                test_start_dt = datetime.strptime(test_start, "%Y-%m-%d")
+                test_end_dt = datetime.strptime(test_end, "%Y-%m-%d")
                 
                 validation_result = {
                     "is_valid": True,
@@ -558,52 +762,7 @@ def create_experiment_questionnaire_class():
                     "errors": ["Date format error - cannot validate timing relationship"]
                 }
         
-        def _validate_date_range(self, start_date: str, end_date: str) -> Dict[str, Any]:
-            """Validate a date range and provide feedback."""
-            try:
-                start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-                end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-                today = datetime.datetime.now()
-                
-                validation_result = {
-                    "is_valid": True,
-                    "start_date": start,
-                    "end_date": end,
-                    "duration_days": (end - start).days,
-                    "warnings": [],
-                    "errors": []
-                }
-                
-                # Check for invalid ranges
-                if end < start:
-                    validation_result["is_valid"] = False
-                    validation_result["errors"].append("End date cannot be before start date")
-                
-                # Check for future dates
-                if start > today:
-                    validation_result["warnings"].append("Start date is in the future")
-                
-                if end > today:
-                    validation_result["warnings"].append("End date is in the future")
-                
-                # Check for very old dates
-                if start < today - datetime.timedelta(days=365*2):
-                    validation_result["warnings"].append("Start date is more than 2 years ago")
-                
-                if end < today - datetime.timedelta(days=365*2):
-                    validation_result["warnings"].append("End date is more than 2 years ago")
-                
-                return validation_result
-                
-            except ValueError as e:
-                return {
-                    "is_valid": False,
-                    "start_date": None,
-                    "end_date": None,
-                    "duration_days": 0,
-                    "warnings": [],
-                    "errors": [f"Date format error: {str(e)}. Please use YYYY-MM-DD format"]
-                }
+
         
         def _compile_all_metrics(self, selected_metrics: List[str], custom_metrics: str) -> List[str]:
             """Compile all metrics for analysis."""
@@ -622,10 +781,10 @@ def create_experiment_questionnaire_class():
         def _categorize_metrics(self, metrics: List[str]) -> Dict[str, List[str]]:
             """Categorize metrics by type."""
             categories = {
-                "Conversion Metrics": ["Conversion Rate", "Revenue per User", "Average Order Value"],
-                "Cost Metrics": ["Customer Acquisition Cost", "Cost per Acquisition (CPA)", "Return on Ad Spend (ROAS)"],
-                "Engagement Metrics": ["Click-through Rate", "Bounce Rate", "Session Duration", "Page Views per Session"],
-                "Customer Metrics": ["Customer Lifetime Value", "Customer Retention Rate", "Net Promoter Score (NPS)", "Customer Satisfaction Score"]
+                "Financial Metrics": ["Authed GMV", "AOV"],
+                "Conversion Metrics": ["Checkouts", "E2E Conversion", "Application Rate", "Authentication Rate", "Approval Rate", "Take-up Rate", "Auth Rate"],
+                "Credit Quality Metrics": ["Median FICO", "% Prime+ Population", "Median ITACS"],
+                "Product Metrics": ["Terms distribution", "% Z-term"]
             }
             
             categorized = {}
@@ -641,6 +800,26 @@ def create_experiment_questionnaire_class():
                 categorized["Other/Uncategorized"] = uncategorized
             
             return categorized
+        
+        def _get_metric_description(self, metric: str) -> str:
+            """Get description and calculation guidance for a metric."""
+            descriptions = {
+                "Authed GMV": "Gross Merchandise Value from authenticated users - Total transaction value after user authentication",
+                "Checkouts": "Number of completed checkout processes - Count of users who reached checkout completion",
+                "E2E Conversion": "End-to-end conversion rate - Users who complete the full journey from start to finish",
+                "AOV": "Average Order Value - Total revenue divided by number of orders",
+                "Application Rate": "Rate of users who submit applications - Applications submitted / total users",
+                "Authentication Rate": "Rate of successful user authentications - Successful auths / total attempts",
+                "Approval Rate": "Rate of approved applications - Approved applications / total applications",
+                "Take-up Rate": "Rate of users who accept offers - Accepted offers / total offers presented",
+                "Auth Rate": "Overall authentication success rate - Successful authentications / total attempts",
+                "Median FICO": "Median FICO score of users - Middle value of all user FICO scores",
+                "% Prime+ Population": "Percentage of users with Prime+ status - Prime+ users / total users",
+                "Median ITACS": "Median ITACS score of users - Middle value of all user ITACS scores",
+                "Terms distribution": "Distribution of loan terms selected - Breakdown of term lengths chosen",
+                "% Z-term": "Percentage of zero-term or immediate transactions - Zero-term transactions / total transactions"
+            }
+            return descriptions.get(metric, "Metric description not available")
         
         def _assess_monitoring_complexity(self, metric_count: int) -> str:
             """Assess the complexity of monitoring based on metric count."""
@@ -676,14 +855,18 @@ def create_experiment_questionnaire_class():
             
             # Define goal-metric mappings
             goal_metric_mapping = {
-                "Increase conversion rates": ["Conversion Rate", "Revenue per User"],
-                "Improve user engagement": ["Click-through Rate", "Session Duration", "Page Views per Session"],
-                "Reduce customer acquisition costs": ["Customer Acquisition Cost", "Cost per Acquisition (CPA)"],
-                "Increase average order value": ["Average Order Value", "Revenue per User"],
-                "Improve customer satisfaction": ["Net Promoter Score (NPS)", "Customer Satisfaction Score"],
-                "Test new features or designs": ["Click-through Rate", "Bounce Rate", "Session Duration"],
-                "Optimize pricing strategy": ["Conversion Rate", "Average Order Value", "Revenue per User"],
-                "Improve checkout process": ["Conversion Rate", "Bounce Rate", "Session Duration"]
+                "Increase conversion rates": ["E2E Conversion", "Application Rate", "Approval Rate", "Take-up Rate"],
+                "Improve user engagement": ["Checkouts", "Authentication Rate", "Auth Rate"],
+                "Reduce customer acquisition costs": ["Application Rate", "Authentication Rate"],
+                "Increase average order value": ["AOV", "Authed GMV"],
+                "Improve customer satisfaction": ["E2E Conversion", "Take-up Rate"],
+                "Test new features or designs": ["Checkouts", "E2E Conversion", "Application Rate"],
+                "Optimize pricing strategy": ["AOV", "Authed GMV", "Terms distribution", "% Z-term"],
+                "Improve checkout process": ["Checkouts", "E2E Conversion", "Application Rate"],
+                "Test APR/pricing changes": ["AOV", "Authed GMV", "Terms distribution", "% Z-term", "Take-up Rate"],
+                "Improve credit approval rates": ["Approval Rate", "Median FICO", "% Prime+ Population", "Median ITACS"],
+                "Increase loan take-up": ["Take-up Rate", "E2E Conversion", "Application Rate"],
+                "Optimize risk assessment": ["Median FICO", "% Prime+ Population", "Median ITACS", "Approval Rate"]
             }
             
             # Count aligned goals
@@ -802,8 +985,8 @@ def create_experiment_questionnaire_class():
             control_end_date = self.responses.get("control_end_date", "")
             if control_start_date and control_end_date:
                 try:
-                    start = datetime.datetime.strptime(control_start_date, "%Y-%m-%d")
-                    end = datetime.datetime.strptime(control_end_date, "%Y-%m-%d")
+                    start = datetime.strptime(control_start_date, "%Y-%m-%d")
+                    end = datetime.strptime(control_end_date, "%Y-%m-%d")
                     control_duration = (end - start).days
                     if control_duration < 14:  # Short control periods add complexity
                         complexity_score += 1
