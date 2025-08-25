@@ -93,7 +93,8 @@ def create_experiment_monitoring_questions():
                 "FICO Bands",
                 "AOV Bands",
                 "ITACS Bands",
-                "Loan Type (IB vs. 0%)"
+                "Loan Type (IB vs. 0%)",
+                "All dimensions from above"
             ],
             "required": True
         },
@@ -237,10 +238,16 @@ def create_experiment_questionnaire_class():
             # Monitoring Segmentation Analysis
             segmentation = self.responses.get("monitoring_segmentation", [])
             if segmentation:
+                all_segmentation = self._compile_all_segmentation(segmentation)
+                # Check if "All dimensions from above" was selected
+                all_dimensions_selected = "All dimensions from above" in segmentation
+                
                 self.analysis_results["segmentation_analysis"] = {
                     "selected_segmentation": segmentation,
-                    "total_segments": len(segmentation),
-                    "segmentation_complexity": self._assess_segmentation_complexity(segmentation),
+                    "all_dimensions_selected": all_dimensions_selected,
+                    "compiled_segmentation": all_segmentation,
+                    "total_segments": len(all_segmentation),
+                    "segmentation_complexity": self._assess_segmentation_complexity(all_segmentation),
                     "segmentation_implications": self._analyze_segmentation_implications(segmentation)
                 }
             
@@ -624,8 +631,16 @@ def create_experiment_questionnaire_class():
                 
                 # Write segmentation
                 segmentation = self.responses.get("monitoring_segmentation", [])
-                for segment in segmentation:
-                    writer.writerow(["Segmentation", "Selected", segment, ""])
+                
+                # Handle "All dimensions from above" selection in CSV
+                if "All dimensions from above" in segmentation:
+                    writer.writerow(["Segmentation", "Selection Type", "All dimensions from above", ""])
+                    all_compiled_segmentation = self._compile_all_segmentation(segmentation)
+                    for segment in all_compiled_segmentation:
+                        writer.writerow(["Segmentation", "Included Dimension", segment, ""])
+                else:
+                    for segment in segmentation:
+                        writer.writerow(["Segmentation", "Selected", segment, ""])
                 
                 # Write additional context
                 additional_context = self.responses.get("additional_context", "")
@@ -699,8 +714,17 @@ def create_experiment_questionnaire_class():
                 f.write("MONITORING SEGMENTATION\n")
                 f.write("-" * 40 + "\n")
                 segmentation = self.responses.get("monitoring_segmentation", [])
-                for i, segment in enumerate(segmentation, 1):
-                    f.write(f"{i}. {segment}\n")
+                
+                # Check if "All dimensions from above" was selected
+                if "All dimensions from above" in segmentation:
+                    f.write("✅ All dimensions from above selected\n")
+                    f.write("   This includes all segmentation dimensions:\n")
+                    all_compiled_segmentation = self._compile_all_segmentation(segmentation)
+                    for i, segment in enumerate(all_compiled_segmentation, 1):
+                        f.write(f"   {i}. {segment}\n")
+                else:
+                    for i, segment in enumerate(segmentation, 1):
+                        f.write(f"{i}. {segment}\n")
                 f.write("\n")
                 
                 # Additional Context
@@ -958,6 +982,30 @@ def create_experiment_questionnaire_class():
             # Remove any "Other" options if they exist
             
             return all_metrics
+        
+        def _compile_all_segmentation(self, selected_segmentation: List[str]) -> List[str]:
+            """Compile all segmentation dimensions for analysis."""
+            all_segmentation = selected_segmentation.copy()
+            
+            # Handle "All dimensions from above" selection
+            if "All dimensions from above" in all_segmentation:
+                # Remove the "All dimensions from above" option
+                all_segmentation.remove("All dimensions from above")
+                # Add all individual segmentation dimensions
+                individual_dimensions = [
+                    "Overall",
+                    "NTA vs. Repeat",
+                    "FICO Bands",
+                    "AOV Bands",
+                    "ITACS Bands",
+                    "Loan Type (IB vs. 0%)"
+                ]
+                # Add individual dimensions (avoiding duplicates)
+                for dimension in individual_dimensions:
+                    if dimension not in all_segmentation:
+                        all_segmentation.append(dimension)
+            
+            return all_segmentation
         
         def _categorize_metrics(self, metrics: List[str]) -> Dict[str, List[str]]:
             """Categorize metrics by type."""
