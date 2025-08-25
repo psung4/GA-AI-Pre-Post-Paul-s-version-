@@ -1,4 +1,5 @@
 SELECT
+-- need to have these dates based on the input from the questionnaire -- 
 
 CASE 
     WHEN to_date(cfv5.checkout_created_dt) BETWEEN '{pre_start_date}' AND '{pre_end_date}' THEN 'Pre'
@@ -68,7 +69,7 @@ left join prod__us.dbt_analytics.merchant_dim md on md.merchant_ari = cfv5.merch
 left join prod__us.dbt_analytics.user_dim on cfv5.user_ari = user_dim.user_ari
 left join prod__us.dbt_analytics.person_stats_mart on user_dim.person_uuid = person_stats_mart.person_uuid
 
--- need to have this change based on the merchant list we specify -- 
-WHERE md.merchant_ari IN ({merchant_ari_list})
+-- need to have this based on the input from the questionnaire -- 
+WHERE md.merchant_ari IN ({merchant_ari_list}) OR md.merchant_partner_ari IN ({merchant_ari_list})
 
 group by all 
