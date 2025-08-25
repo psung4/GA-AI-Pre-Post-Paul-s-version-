@@ -1,6 +1,6 @@
 SELECT
 
-, CASE 
+CASE 
     WHEN to_date(cfv5.checkout_created_dt) BETWEEN '{pre_start_date}' AND '{pre_end_date}' THEN 'Pre'
     WHEN to_date(cfv5.checkout_created_dt) BETWEEN '{post_start_date}' AND '{post_end_date}' THEN 'Post'
     ELSE 'Other'
