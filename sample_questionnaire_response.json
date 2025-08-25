@@ -1,0 +1,201 @@
+{
+  "timestamp": "2025-08-25T10:23:58.681482",
+  "question_set": "business_analysis",
+  "set_info": {
+    "name": "Business Analysis",
+    "description": "Comprehensive business analysis covering type, size, revenue, growth, and challenges",
+    "questions": [
+      {
+        "id": "business_type",
+        "question": "What type of business are you analyzing?",
+        "type": "multiple_choice",
+        "options": [
+          "Technology",
+          "Finance",
+          "Healthcare",
+          "Retail",
+          "Manufacturing",
+          "Other"
+        ],
+        "required": true
+      },
+      {
+        "id": "company_size",
+        "question": "What is the approximate size of the company?",
+        "type": "multiple_choice",
+        "options": [
+          "1-10 employees",
+          "11-50 employees",
+          "51-200 employees",
+          "201-1000 employees",
+          "1000+ employees"
+        ],
+        "required": true
+      },
+      {
+        "id": "revenue_range",
+        "question": "What is the annual revenue range?",
+        "type": "multiple_choice",
+        "options": [
+          "Under $100K",
+          "$100K - $1M",
+          "$1M - $10M",
+          "$10M - $100M",
+          "$100M+"
+        ],
+        "required": true
+      },
+      {
+        "id": "growth_rate",
+        "question": "What is the current growth rate?",
+        "type": "multiple_choice",
+        "options": [
+          "Declining",
+          "Stable",
+          "Growing slowly (1-10%)",
+          "Growing moderately (10-25%)",
+          "Growing rapidly (25%+)"
+        ],
+        "required": true
+      },
+      {
+        "id": "market_position",
+        "question": "How would you describe the company's market position?",
+        "type": "multiple_choice",
+        "options": [
+          "Market leader",
+          "Strong competitor",
+          "Established player",
+          "Emerging player",
+          "Niche player"
+        ],
+        "required": true
+      },
+      {
+        "id": "challenges",
+        "question": "What are the main challenges the company faces? (Select all that apply)",
+        "type": "multi_select",
+        "options": [
+          "Market competition",
+          "Regulatory compliance",
+          "Technology disruption",
+          "Talent acquisition",
+          "Financial constraints",
+          "Supply chain issues",
+          "Customer retention"
+        ],
+        "required": true
+      },
+      {
+        "id": "opportunities",
+        "question": "What opportunities do you see for the company?",
+        "type": "text",
+        "required": false
+      },
+      {
+        "id": "risk_factors",
+        "question": "What are the main risk factors?",
+        "type": "text",
+        "required": false
+      },
+      {
+        "id": "recommendations",
+        "question": "What recommendations would you make?",
+        "type": "text",
+        "required": false
+      }
+    ],
+    "category": "business"
+  },
+  "responses": {
+    "business_type": "Retail",
+    "company_size": "1000+ employees",
+    "revenue_range": "$100M+",
+    "growth_rate": "Stable",
+    "market_position": "Strong competitor",
+    "challenges": [
+      "Market competition",
+      "Regulatory compliance",
+      "Technology disruption"
+    ],
+    "opportunities": "1",
+    "risk_factors": "1",
+    "recommendations": ""
+  },
+  "analysis": {
+    "business_insights": {
+      "type": "Retail",
+      "characteristics": [
+        "Customer-centric",
+        "Seasonal",
+        "Inventory management",
+        "Location-dependent"
+      ]
+    },
+    "size_analysis": {
+      "size": "1000+ employees",
+      "implications": [
+        "Enterprise scale",
+        "Complex bureaucracy",
+        "Global presence",
+        "Institutional processes"
+      ]
+    },
+    "revenue_analysis": {
+      "revenue_range": "$100M+",
+      "financial_health": "Enterprise - Focus on optimization and innovation"
+    },
+    "growth_analysis": {
+      "growth_rate": "Stable",
+      "stage": "Maturity phase - Focus on efficiency and innovation"
+    },
+    "market_analysis": {
+      "position": "Strong competitor",
+      "strategic_implications": [
+        "Challenge leader",
+        "Differentiate offerings",
+        "Improve efficiency",
+        "Expand capabilities"
+      ]
+    },
+    "challenges_analysis": {
+      "challenges": [
+        "Market competition",
+        "Regulatory compliance",
+        "Technology disruption"
+      ],
+      "priority_levels": {
+        "Market competition": "High",
+        "Regulatory compliance": "Medium",
+        "Technology disruption": "High"
+      },
+      "mitigation_strategies": {
+        "Market competition": [
+          "Differentiate offerings",
+          "Improve customer service",
+          "Innovate products"
+        ],
+        "Regulatory compliance": [
+          "Hire compliance experts",
+          "Implement compliance systems",
+          "Regular audits"
+        ],
+        "Technology disruption": [
+          "Invest in R&D",
+          "Partner with tech companies",
+          "Hire tech talent"
+        ]
+      }
+    },
+    "overall_assessment": {
+      "risk_level": "Low",
+      "risk_score": 0,
+      "overall_health": "Good",
+      "key_recommendations": [
+        "Maintain current strategies",
+        "Focus on growth opportunities",
+        "Continue monitoring for emerging risks"
+      ]
+    }
+  }
+}
