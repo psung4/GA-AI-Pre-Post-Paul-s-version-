@@ -52,7 +52,7 @@ END AS AOV_bucket
 , count(distinct case when cfv5.is_approved = 1 then cfv5.checkout_ari end) as approved_checkouts 
 , count(distinct case when cfv5.is_confirmed = 1 then cfv5.checkout_ari end) as confirmed_checkouts
 , count(distinct case when cfv5.is_authed = 1 then cfv5.checkout_ari end) as authed_checkouts
-, sum(case when cfv5.is_authed = 1 then cfv5.total_amount end) as total_amount
+, sum(case when cfv5.is_authed = 1 then cfv5.total_amount end) as GMV
 , COALESCE(authenticated,0) / NULLIF(checkouts,0) as authentication_rate
 , COALESCE(identity_approved,0) / NULLIF(authenticated,0) as identity_approval_rate
 , COALESCE(fraud_approved,0) / NULLIF(authenticated,0) as fraud_approval_rate
